@@ -1,13 +1,10 @@
-
-
-
+// MiniGameKit.js
 export class Component {
   constructor() {}
   start(go) {}
   update(go, dt) {}
   render(ctx, go) {}
 }
-
 
 export class Transform extends Component {
   constructor({ x = 0, y = 0, rotation = 0, angle = 0, scale = 1 } = {}) {
@@ -18,7 +15,6 @@ export class Transform extends Component {
     this.scale = scale;
   }
 }
-
 
 export class GameObject {
   constructor(scene) {
@@ -47,14 +43,12 @@ export class GameObject {
     for (const p of this.plugins) if (p.render) p.render(ctx, this);
   }
 
-  
   addPlugin(plugin) {
     this.plugins.push(plugin);
     if (plugin.start) plugin.start(this);
     return this;
   }
 }
-
 
 export class Game {
   constructor({ width = window.innerWidth, height = window.innerHeight, parent = document.body } = {}) {
@@ -63,10 +57,8 @@ export class Game {
     this.canvas.height = height;
     parent.appendChild(this.canvas);
     this.ctx = this.canvas.getContext("2d");
-
     this.objects = [];
     this.plugins = [];
-
     this.lastTime = 0;
     this.running = false;
   }
@@ -92,10 +84,8 @@ export class Game {
   loop(t = 0) {
     const dt = (t - this.lastTime) / 1000 || 0;
     this.lastTime = t;
-
     this.update(dt);
     this.render();
-
     if (this.running) requestAnimationFrame(this.loop.bind(this));
   }
 
@@ -111,14 +101,14 @@ export class Game {
   }
 }
 
-
 export class RigidBody extends Component {
   constructor({
     velocity = { x: 0, y: 0 },
     angularVelocity = 0,
-    gravity = 900,
-    friction = 0.1,
+    gravity = 980,
+    friction = 0.05,
     restitution = 0.7,
+    mass = 1,
     buoyancy = 0,
   } = {}) {
     super();
@@ -127,65 +117,17 @@ export class RigidBody extends Component {
     this.gravity = gravity;
     this.friction = friction;
     this.restitution = restitution;
+    this.mass = mass <= 0 ? 1 : mass;
     this.buoyancy = buoyancy;
   }
-
-  update(go, dt) {
-    const t = go.getComponent(Transform);
-    if (!t) return;
-
-    
-    this.velocity.y += (this.gravity - this.buoyancy) * dt;
-
-    
-    t.position.x += this.velocity.x * dt;
-    t.position.y += this.velocity.y * dt;
-    t.angle += this.angularVelocity * dt;
-
-    
-    this.velocity.x *= 1 - this.friction;
-    this.velocity.y *= 1 - this.friction;
-    this.angularVelocity *= 1 - this.friction;
-  }
 }
-
 
 export class Collider extends Component {
   constructor({ radius }) {
     super();
     this.radius = radius;
   }
-
-  update(go, dt) {
-    const t = go.getComponent(Transform);
-    const rb = go.getComponent(RigidBody);
-    const canvas = go.scene.canvas;
-    if (!t || !rb) return;
-
-    
-    if (t.position.y + this.radius > canvas.height) {
-      t.position.y = canvas.height - this.radius;
-      rb.velocity.y *= -rb.restitution;
-      if (Math.abs(rb.velocity.y) < 10) rb.velocity.y = 0;
-    }
-    
-    if (t.position.y - this.radius < 0) {
-      t.position.y = this.radius;
-      rb.velocity.y *= -rb.restitution;
-    }
-    
-    if (t.position.x - this.radius < 0) {
-      t.position.x = this.radius;
-      rb.velocity.x *= -rb.restitution;
-    }
-    
-    if (t.position.x + this.radius > canvas.width) {
-      t.position.x = canvas.width - this.radius;
-      rb.velocity.x *= -rb.restitution;
-    }
-  }
 }
-
 
 export class Circle extends Component {
   constructor({ radius = 20, fill = "cyan" } = {}) {
@@ -210,9 +152,7 @@ export class Circle extends Component {
   }
 }
 
-
 export class SpriteRenderer extends Component {
-  
   constructor({
     url,
     frameWidth = null,
@@ -226,21 +166,17 @@ export class SpriteRenderer extends Component {
     this.url = url;
     this.image = new Image();
     this.image.src = url;
-
     this.frameWidth = frameWidth;
     this.frameHeight = frameHeight;
     this.frameCount = frameCount;
     this.frameSpeed = frameSpeed;
     this.loop = loop;
     this.scale = scale;
-
     this.currentFrame = 0;
     this.accumulator = 0;
-
     this.loaded = false;
     this.image.onload = () => {
       this.loaded = true;
-      
       if (!this.frameWidth) this.frameWidth = this.image.width;
       if (!this.frameHeight) this.frameHeight = this.image.height;
     };
@@ -265,30 +201,27 @@ export class SpriteRenderer extends Component {
     if (!this.loaded) return;
     const t = go.getComponent(Transform);
     if (!t) return;
-
     ctx.save();
     ctx.translate(t.position.x, t.position.y);
     ctx.rotate(t.angle);
-
-    
     const sx = this.currentFrame * this.frameWidth;
     const sy = 0;
     const sw = this.frameWidth;
     const sh = this.frameHeight;
-
     const dw = sw * this.scale;
     const dh = sh * this.scale;
-
-    ctx.drawImage(this.image, sx, sy, sw, sh, -dw/2, -dh/2, dw, dh);
+    ctx.drawImage(this.image, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh);
     ctx.restore();
   }
 }
+
 export class Plugin {
   constructor() {}
   start(target) {}
   update(target, dt) {}
   render(ctx, target) {}
 }
+
 export function createPlugin({ start, update, render }) {
   return class extends Plugin {
     constructor() {
