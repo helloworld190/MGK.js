@@ -26,6 +26,7 @@ export class GameObject {
     this.components = [];
     this.plugins = [];
     this.eventEmitter = new EventEmitter();
+    this.startedComponents = new Set();
   }
 
   on(event, callback) {
@@ -45,7 +46,10 @@ export class GameObject {
 
   addComponent(comp) {
     this.components.push(comp);
-    if (comp.start) comp.start(this);
+    if (!this.startedComponents.has(comp) && comp.start) {
+      comp.start(this);
+      this.startedComponents.add(comp);
+    }
     return this;
   }
 
@@ -67,6 +71,15 @@ export class GameObject {
     this.plugins.push(plugin);
     if (plugin.start) plugin.start(this);
     return this;
+  }
+
+  destroy() {
+    if (this.scene) {
+      const index = this.scene.objects.indexOf(this);
+      if (index !== -1) this.scene.objects.splice(index, 1);
+    }
+    this.components.length = 0;
+    this.plugins.length = 0;
   }
 }
 
@@ -114,12 +127,12 @@ export class Game {
   }
 
   update(dt) {
-    // Update plugins first (e.g., CollisionSystem)
+    
     for (const p of this.plugins) {
       if (p.update) p.update(this, dt);
     }
 
-    // Update all game objects
+    
     this.objects.forEach(obj => {
       obj.update(dt);
 
@@ -128,9 +141,7 @@ export class Game {
       }
     });
 
-    // Update UI root container if needed (optional)
-    // If your UI components have update methods, you could:
-    // this.uiRoot.update(dt);
+    
   }
 
 
@@ -206,55 +217,6 @@ export class RigidBody extends Component {
     t.position.x += this.velocity.x * dt;
     t.position.y += this.velocity.y * dt;
     t.angle += this.angularVelocity * dt;
-  }
-}
-
-export class GameObject {
-  constructor(scene) {
-    this.scene = scene;
-    this.components = [];
-    this.plugins = [];
-    this.startedComponents = new Set();
-  }
-
-  addComponent(comp) {
-    this.components.push(comp);
-    if (!this.startedComponents.has(comp) && comp.start) {
-      comp.start(this);
-      this.startedComponents.add(comp);
-    }
-    return this;
-  }
-
-  getComponent(type) {
-    return this.components.find((c) => c instanceof type);
-  }
-
-  update(dt) {
-    for (const c of this.components) {
-      if (c.update) c.update(this, dt);
-    }
-    for (const p of this.plugins) if (p.update) p.update(this, dt);
-  }
-
-  render(ctx) {
-    for (const c of this.components) if (c.render) c.render(ctx, this);
-    for (const p of this.plugins) if (p.render) p.render(ctx, this);
-  }
-
-  addPlugin(plugin) {
-    this.plugins.push(plugin);
-    if (plugin.start) plugin.start(this);
-    return this;
-  }
-
-  destroy() {
-    if (this.scene) {
-      const index = this.scene.objects.indexOf(this);
-      if (index !== -1) this.scene.objects.splice(index, 1);
-    }
-    this.components.length = 0;
-    this.plugins.length = 0;
   }
 }
 

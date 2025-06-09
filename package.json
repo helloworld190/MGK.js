@@ -1,0 +1,31 @@
+{
+  "name": "mgk.js",
+  "version": "1.0.0",
+  "description": "epik framework for creating simple 2d games with web technologies, this package is new so 100% there might be bugs(entire package not working could also be the case) PLUSS this is open-source (can access it via github: https://github.com/helloworld190/MGK.js), and its fairly easy to pick up since its built on top of canvas2d.",
+  "main": "MiniGameKit.js",
+  "scripts": {
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/helloworld190/MGK.js.git"
+  },
+  "keywords": [
+    "game-engine",
+    "javascript",
+    "2d",
+    "game-framework",
+    "gamedev",
+    "lightweight",
+    "epik"
+  ],
+  "author": "helloworld190 <helloworld190@example.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/helloworld190/MGK.js/issues"
+  },
+  "homepage": "https://github.com/helloworld190/MGK.js#",
+  "engines": {
+    "node": ">=14"
+  }
+}
