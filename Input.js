@@ -5,10 +5,14 @@ export class Input {
     this.touches = new Map();
     this.gamepads = [];
     this.tvKeys = new Set();
+    this._keyListeners = [];
+    this._mouseListeners = [];
+    this._touchListeners = [];
 
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.key);
       this.tvKeys.add(e.key);
+      this._keyListeners.forEach((fn) => fn(e));
     });
     window.addEventListener("keyup", (e) => {
       this.keys.delete(e.key);
@@ -81,5 +85,17 @@ export class Input {
 
   isTVKeyDown(key) {
     return this.tvKeys.has(key);
+  }
+
+  onKey(fn) {
+    this._keyListeners.push(fn);
+  }
+
+  onMouse(fn) {
+    this._mouseListeners.push(fn);
+  }
+
+  onTouch(fn) {
+    this._touchListeners.push(fn);
   }
 }

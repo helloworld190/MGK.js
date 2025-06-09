@@ -8,6 +8,7 @@ export class UIElement {
     this.parent = null;
     this.children = [];
     this.hovered = false;
+    this.zIndex = 0; // Add zIndex for UI layering
   }
 
   update(dt) {}
@@ -46,6 +47,8 @@ export class UIElement {
   addChild(child) {
     child.parent = this;
     this.children.push(child);
+    // Sort children by zIndex for proper draw order
+    this.children.sort((a, b) => a.zIndex - b.zIndex);
   }
 }
 
@@ -60,6 +63,8 @@ export class UIContainer extends UIElement {
     if (!this.visible) return;
     ctx.save();
     ctx.translate(this.x, this.y);
+    // Sort children by zIndex before rendering
+    this.children.sort((a, b) => a.zIndex - b.zIndex);
     for (const child of this.children) {
       if (child.visible) child.render(ctx);
     }
@@ -87,6 +92,7 @@ export class Button extends UIElement {
       font: style.font || '16px sans-serif',
       borderRadius: style.borderRadius || 5,
     };
+    this.zIndex = style.zIndex || 0; // Allow zIndex in style
   }
 
   render(ctx) {

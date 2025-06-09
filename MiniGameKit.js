@@ -8,6 +8,11 @@ export class Component {
   render(ctx, go) { }
 }
 
+// --- Utility: Warn helper ---
+function warn(msg) {
+  if (console && console.warn) console.warn('[MGK.js]', msg);
+}
+
 export class Transform extends Component {
   constructor({ x = 0, y = 0, rotation = 0, angle = 0, scale = 1 } = {}) {
     super();
@@ -27,9 +32,12 @@ export class GameObject {
     this.plugins = [];
     this.eventEmitter = new EventEmitter();
     this.startedComponents = new Set();
+    this.zIndex = 0;
+    this.collisionEnabled = true;
   }
 
   on(event, callback) {
+    if (!event) warn('Tried to listen to undefined event');
     this.eventEmitter.on(event, callback);
     return this;
   }
@@ -40,11 +48,17 @@ export class GameObject {
   }
 
   emit(event, ...args) {
+    if (!event) warn('Tried to emit undefined event');
     this.eventEmitter.emit(event, ...args);
     return this;
   }
 
   addComponent(comp) {
+    const type = comp.constructor;
+    if (this.getComponent(type)) {
+      warn(`Component of type ${type.name} already exists on GameObject.`);
+      return this;
+    }
     this.components.push(comp);
     if (!this.startedComponents.has(comp) && comp.start) {
       comp.start(this);
@@ -93,7 +107,7 @@ export class Game {
     this.ctx = this.canvas.getContext("2d");
     this.objects = [];
     this.plugins = [];
-    this.lastTime = 0;
+    this.lastTime = performance.now(); // Fix: initialize to now
     this.running = false;
     this.boundaryEnabled = false;
     this.input = new Input(this.canvas);
@@ -127,48 +141,39 @@ export class Game {
   }
 
   update(dt) {
-    
     for (const p of this.plugins) {
       if (p.update) p.update(this, dt);
     }
-
-    
+    // Sort objects by zIndex for rendering order
+    this.objects.sort((a, b) => a.zIndex - b.zIndex);
     this.objects.forEach(obj => {
       obj.update(dt);
-
       if (this.boundaryEnabled) {
         this.handleBoundary(obj);
       }
     });
-
-    
+    // Optionally update UI
+    // this.uiRoot.update(dt);
   }
-
 
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-
     this.objects.forEach(obj => obj.render(this.ctx));
-
-
     for (const p of this.plugins) {
       if (p.render) p.render(this.ctx, this);
     }
-
-
     this.uiRoot.render(this.ctx);
   }
-
 
   handleBoundary(obj) {
     const t = obj.getComponent(Transform);
     const rb = obj.getComponent(RigidBody);
     const col = obj.getComponent(Collider);
-    if (!t || !rb || !col) return;
-
+    if (!t || !rb || !col) {
+      warn('Boundary handling skipped: missing Transform, RigidBody, or Collider.');
+      return;
+    }
     const radius = col.radius;
-
     if (t.position.x - radius < 0) {
       t.position.x = radius;
       rb.velocity.x = Math.abs(rb.velocity.x);
@@ -176,7 +181,6 @@ export class Game {
       t.position.x = this.canvas.width - radius;
       rb.velocity.x = -Math.abs(rb.velocity.x);
     }
-
     if (t.position.y - radius < 0) {
       t.position.y = radius;
       rb.velocity.y = Math.abs(rb.velocity.y);
@@ -221,34 +225,34 @@ export class RigidBody extends Component {
 }
 
 
+// --- Collider: add collisionEnabled flag ---
 export class Collider extends Component {
-  constructor({ radius = 10 } = {}) {
+  constructor({ radius = 10, collisionEnabled = true } = {}) {
     super();
     this.radius = radius;
+    this.collisionEnabled = collisionEnabled;
   }
 }
 
+// --- CollisionSystem: add collision callbacks and skip disabled ---
 export class CollisionSystem extends Plugin {
   start(scene) {
     this.scene = scene;
   }
-
   update(scene, dt) {
     const objs = scene.objects;
     for (let i = 0; i < objs.length; i++) {
       const a = objs[i];
       const aCollider = a.getComponent(Collider);
-      if (!aCollider) continue;
+      if (!aCollider || !a.collisionEnabled || aCollider.collisionEnabled === false) continue;
       const aTransform = a.getComponent(Transform);
       const aRigid = a.getComponent(RigidBody);
-
       for (let j = i + 1; j < objs.length; j++) {
         const b = objs[j];
         const bCollider = b.getComponent(Collider);
-        if (!bCollider) continue;
+        if (!bCollider || !b.collisionEnabled || bCollider.collisionEnabled === false) continue;
         const bTransform = b.getComponent(Transform);
         const bRigid = b.getComponent(RigidBody);
-
         const dx = bTransform.position.x - aTransform.position.x;
         const dy = bTransform.position.y - aTransform.position.y;
         const dist = Math.hypot(dx, dy);
@@ -257,34 +261,30 @@ export class CollisionSystem extends Plugin {
           const overlap = minDist - dist;
           const nx = dx / dist || 0;
           const ny = dy / dist || 0;
-
           if (aRigid && bRigid) {
             const totalMass = aRigid.mass + bRigid.mass;
             const correctionA = (overlap * (bRigid.mass / totalMass));
             const correctionB = (overlap * (aRigid.mass / totalMass));
-
             aTransform.position.x -= nx * correctionA;
             aTransform.position.y -= ny * correctionA;
             bTransform.position.x += nx * correctionB;
             bTransform.position.y += ny * correctionB;
-
             const relVelX = bRigid.velocity.x - aRigid.velocity.x;
             const relVelY = bRigid.velocity.y - aRigid.velocity.y;
-
             const velAlongNormal = relVelX * nx + relVelY * ny;
             if (velAlongNormal > 0) continue;
-
             const e = Math.min(aRigid.restitution, bRigid.restitution);
             const j = -(1 + e) * velAlongNormal / (1 / aRigid.mass + 1 / bRigid.mass);
-
             const impulseX = j * nx;
             const impulseY = j * ny;
-
             aRigid.velocity.x -= impulseX / aRigid.mass;
             aRigid.velocity.y -= impulseY / aRigid.mass;
             bRigid.velocity.x += impulseX / bRigid.mass;
             bRigid.velocity.y += impulseY / bRigid.mass;
           }
+          // --- Collision callback ---
+          if (typeof a.onCollision === 'function') a.onCollision(b);
+          if (typeof b.onCollision === 'function') b.onCollision(a);
         }
       }
     }
@@ -342,6 +342,9 @@ export class SpriteRenderer extends Component {
       this.loaded = true;
       if (!this.frameWidth) this.frameWidth = this.image.width;
       if (!this.frameHeight) this.frameHeight = this.image.height;
+    };
+    this.image.onerror = () => {
+      warn(`Failed to load sprite image: ${url}`);
     };
   }
 
